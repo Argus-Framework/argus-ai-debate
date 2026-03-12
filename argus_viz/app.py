@@ -13,6 +13,13 @@ import os
 import json
 import streamlit as st
 
+# Load .env so GOOGLE_API_KEY and other keys are available
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=False)
+except ImportError:
+    pass  # python-dotenv not installed; rely on shell env vars
+
 # Must be first Streamlit call
 st.set_page_config(
     page_title="Argus-Viz | Debate Sandbox",
@@ -105,7 +112,7 @@ def render_sidebar() -> dict:
             "anthropic": "claude-3-5-sonnet-20241022",
             "gemini": "gemini-2.0-flash",
             "ollama": "llama3.1",
-            "groq": "llama-3.1-70b-versatile",
+            "groq": "llama-3.3-70b-versatile",
             "mistral": "mistral-large-latest",
             "cohere": "command-r-plus",
             "deepseek": "deepseek-chat",
@@ -116,11 +123,19 @@ def render_sidebar() -> dict:
             help="Model identifier. Leave empty for provider default.",
         )
 
-        # API Key
+        # Auto-load API key from environment for the selected provider
+        _env_key_map = {
+            "groq": "GROQ_API_KEY", "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY", "gemini": "GOOGLE_API_KEY",
+            "mistral": "MISTRAL_API_KEY", "cohere": "COHERE_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY", "together": "TOGETHER_API_KEY",
+        }
+        _env_val = os.environ.get(_env_key_map.get(provider, ""), "")
         api_key = st.text_input(
             "API Key",
+            value=_env_val,
             type="password",
-            help="API key for the selected provider. Set here or via environment variable.",
+            help="API key for the selected provider. Auto-loaded from .env / environment.",
         )
 
         st.markdown("---")
@@ -298,7 +313,7 @@ def run_debate(config: dict):
             with live_chart_container.container():
                 if self.rounds_so_far:
                     fig = plot_posterior_evolution(self.rounds_so_far)
-                    st.plotly_chart(fig, use_container_width=True, key=f"live_posterior_{rnd}")
+                    st.plotly_chart(fig, width="stretch", key=f"live_posterior_{rnd}")
 
             # Update live debate flow graph incrementally
             with live_flow_container.container():
@@ -313,7 +328,7 @@ def run_debate(config: dict):
                     "graph_data": {"nodes": [], "edges": []},
                 }
                 flow_fig = plot_debate_flow_graph(partial_result)
-                st.plotly_chart(flow_fig, use_container_width=True, key=f"live_flow_{rnd}")
+                st.plotly_chart(flow_fig, width="stretch", key=f"live_flow_{rnd}")
 
             # Log round details
             with round_log_container:
@@ -404,7 +419,7 @@ def render_debate_arena(config: dict):
         st.markdown("---")
         st.markdown("### 🔀 Debate Flow Graph")
         flow_fig = plot_debate_flow_graph(result)
-        st.plotly_chart(flow_fig, use_container_width=True, key="arena_final_flow")
+        st.plotly_chart(flow_fig, width="stretch", key="arena_final_flow")
 
 
 # ---------------------------------------------------------------------------
@@ -425,34 +440,34 @@ def render_analysis_dashboard():
     # Row 1: Posterior + Polarity
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.plotly_chart(charts["posterior_evolution"], use_container_width=True, key="dash_posterior")
+        st.plotly_chart(charts["posterior_evolution"], width="stretch", key="dash_posterior")
     with col2:
-        st.plotly_chart(charts["evidence_polarity"], use_container_width=True, key="dash_polarity")
+        st.plotly_chart(charts["evidence_polarity"], width="stretch", key="dash_polarity")
 
     # Row 2: Waterfall + Radar
     col1, col2 = st.columns(2)
     with col1:
-        st.plotly_chart(charts["evidence_waterfall"], use_container_width=True, key="dash_waterfall")
+        st.plotly_chart(charts["evidence_waterfall"], width="stretch", key="dash_waterfall")
     with col2:
-        st.plotly_chart(charts["specialist_radar"], use_container_width=True, key="dash_radar")
+        st.plotly_chart(charts["specialist_radar"], width="stretch", key="dash_radar")
 
     # Row 3: Timeline + Heatmap
     col1, col2 = st.columns(2)
     with col1:
-        st.plotly_chart(charts["debate_timeline"], use_container_width=True, key="dash_timeline")
+        st.plotly_chart(charts["debate_timeline"], width="stretch", key="dash_timeline")
     with col2:
-        st.plotly_chart(charts["round_heatmap"], use_container_width=True, key="dash_heatmap")
+        st.plotly_chart(charts["round_heatmap"], width="stretch", key="dash_heatmap")
 
     # Row 4: Confidence + CDAG
     col1, col2 = st.columns(2)
     with col1:
-        st.plotly_chart(charts["confidence_histogram"], use_container_width=True, key="dash_confidence")
+        st.plotly_chart(charts["confidence_histogram"], width="stretch", key="dash_confidence")
     with col2:
-        st.plotly_chart(charts["cdag_network"], use_container_width=True, key="dash_cdag")
+        st.plotly_chart(charts["cdag_network"], width="stretch", key="dash_cdag")
 
     # Row 5: Full debate flow graph (full width)
     st.markdown("---")
-    st.plotly_chart(charts["debate_flow_graph"], use_container_width=True, key="dash_flow_graph")
+    st.plotly_chart(charts["debate_flow_graph"], width="stretch", key="dash_flow_graph")
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +480,7 @@ def render_debate_flow_tab():
 
     # Pipeline diagram
     fig = render_debate_flow_diagram()
-    st.plotly_chart(fig, use_container_width=True, key="flow_tab_sankey")
+    st.plotly_chart(fig, width="stretch", key="flow_tab_sankey")
 
     st.markdown("---")
 
