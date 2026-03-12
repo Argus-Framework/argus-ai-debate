@@ -6,7 +6,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PyPI version](https://badge.fury.io/py/argus-debate-ai.svg)](https://pypi.org/project/argus-debate-ai/3.1.0/)
+[![PyPI version](https://badge.fury.io/py/argus-debate-ai.svg)](https://pypi.org/project/argus-debate-ai/4.5.0/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Type Checking: mypy](https://img.shields.io/badge/type%20checking-mypy-blue.svg)](https://mypy.readthedocs.io/)
 [![Tools: 50+](https://img.shields.io/badge/tools-50+-green.svg)](https://github.com/Ronit26Mehta/argus-ai-debate#tool-integrations-50)
@@ -31,6 +31,8 @@
 - [Visualization & Plotting](#visualization--plotting)
 - [Argus Terminal (TUI)](#argus-terminal-tui)
 - [Argus-Viz (Streamlit Sandbox)](#argus-viz-streamlit-sandbox)
+- [CRUX-Viz (CRUX Protocol Sandbox)](#crux-viz-crux-protocol-sandbox)
+- [ARISTOTLE Chat Interface](#aristotle-chat-interface)
 - [CRUX Protocol](#crux-protocol)
 - [Command Line Interface](#command-line-interface)
 - [Configuration](#configuration)
@@ -1842,6 +1844,124 @@ streamlit run argus_viz/app.py
 During a debate, two charts update side-by-side in real-time:
 - **Left**: Posterior probability evolution (line chart with confidence band)
 - **Right**: Debate flow DAG — nodes and edges grow each round (Proposition → Specialists → Evidence → Rebuttals → Bayesian Updates → Verdict)
+
+---
+
+---
+
+## CRUX-Viz (CRUX Protocol Sandbox)
+
+**CRUX-Viz** is a dedicated Streamlit sandbox for the CRUX (Claim-Routed Uncertainty eXchange) protocol — visualizing all **7 CRUX primitives** in real-time with live streaming, interactive charts, and step-by-step protocol explanations.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **⚡ CRUX Arena** | Run full CRUX debates with live streaming — watch posterior, Claim Bundles, auctions, and BRP events accumulate in real-time |
+| **CRUX-specific sidebar controls** | Set `Contradiction Threshold (θ)`, toggle `EDR`, set `Auction Timeout` alongside standard LLM + specialist config |
+| **📦 Claim Bundle cards** | Every piece of evidence rendered as a CRUX Claim Bundle with polarity badge, posterior, credibility, and challenge status |
+| **🔀 BRP cards** | Belief Reconciliation Protocol sessions shown with contradiction Δ and reconciled posterior |
+| **🏆 Auction cards** | Challenger Auction results with winner, bid count, and DFS score |
+| **9 Interactive Charts** | Posterior evolution, CB timeline (gantt), session KPI radar, BRP summary, credibility snapshot, auction summary, EDR checkpoints, evidence polarity donut, synthetic CRUX flow DAG |
+| **🔄 CRUX Flow** | Live synthetic debate flow DAG — nodes = Claim Bundles, stars = BRP merges |
+| **📖 Protocol Explainer** | Interactive Sankey diagram of the full CRUX pipeline + detailed docs for all 7 primitives with LaTeX formulas |
+| **📋 Raw Data Export** | Download full CRUX result (incl. session, CBs, auctions, BRP sessions, EDR checkpoints) as JSON |
+
+### Quick Start
+
+```bash
+# Install crux-viz dependencies
+pip install "argus-debate-ai[crux-viz]"
+
+# Launch (any of these work)
+crux-viz
+python -m crux_viz
+streamlit run crux_viz/app.py
+```
+
+### Tabs
+
+| Tab | What It Shows |
+|-----|---------------|
+| **⚡ CRUX Arena** | Live posterior chart + CRUX flow DAG updating each round; verdict card; CB, BRP, auction cards; CRUX session stats |
+| **📊 Analysis Dashboard** | All 9 Plotly charts in a grid layout |
+| **🔄 CRUX Flow** | Full synthetic CRUX debate flow DAG with BRP merge stars |
+| **📖 Protocol** | Sankey pipeline of 7 primitives, per-primitive docs + formulae, data overlay |
+| **📋 Raw Data** | JSON viewer (result, session stats, credibility ledger, EDR checkpoints), download button |
+
+### CRUX-Specific Sidebar Options
+
+```
+Contradiction Threshold (θ)  — Default 0.20
+    Minimum posterior gap that triggers BRP reconciliation
+
+Enable EDR                   — Default On
+    Create Epistemic Dead Reckoning checkpoints
+
+Auction Timeout (s)          — Default 30
+    Maximum time for Challenger Auction bidding window
+```
+
+---
+
+## ARISTOTLE Chat Interface
+
+**ARISTOTLE** (Autonomous Reasoning Intelligence for Structured Topic-Orchestrated Logical Engagement) is a five-layer meta-orchestration module that transforms a single natural-language question into a fully autonomous, visualised, auditable multi-agent debate — all from a WhatsApp-style chat interface.
+
+### Launch
+
+```bash
+# One-command launch (after pip install)
+aristotle-chat
+
+# Or via the ARGUS CLI
+argus aristotle run
+
+# Or directly with Streamlit
+streamlit run argus/aristotle/interface.py
+```
+
+### Install Dependencies
+
+```bash
+pip install "argus-debate-ai[aristotle]"
+```
+
+### Architecture Layers
+
+| Layer | Module | Role |
+|-------|--------|------|
+| **L1** | `framing.py` | Intent Parsing & Framing Engine — classifies debate type, extracts sub-claims |
+| **L2** | `topology.py` | Dynamic Topology Builder — selects specialist agents, jury architecture, refuter intensity |
+| **L3** | `monitor.py` | Autonomous Execution Engine — drives ARGUS rounds, enforces budgets, logs decisions |
+| **L4** | `interface.py` | Single-Pane Split Streamlit UI with live DAG, belief trajectory, and evidence heatmap |
+| **L5** | `synthesis.py` | Plain-Language Output Synthesis — verdict narrative, dissent log, "What Could Change This" |
+
+### UI Layout
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Status Bar (full width)                                         │
+├────────────────────┬─────────────────────────────────────────────┤
+│  LEFT  (38%)       │  RIGHT (62%)                                │
+│  ARISTOTLE chat    │  Zone A: Full Lifecycle DAG (55%)           │
+│                    │  Zone B: Belief + Heatmap (35%)             │
+│  [input box]       │  Zone C: Expander (more panels)            │
+└────────────────────┴─────────────────────────────────────────────┘
+```
+
+### Programmatic Usage
+
+```python
+from argus.aristotle import ARISTOTLE
+from argus.core.llm import get_llm
+
+agent = ARISTOTLE(llm=get_llm("openai", model="gpt-4o"))
+result = agent.run("Is social media causing the mental health crisis?")
+
+print(result.verdict_narrative)
+print(result.dissent_log)
+```
 
 ---
 
