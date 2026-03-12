@@ -8,10 +8,16 @@ to challenge existing evidence and propositions.
 from __future__ import annotations
 
 import json
+import re
 import logging
 from typing import Optional, Any, TYPE_CHECKING
 
 from pydantic import Field
+
+from argus.core.json_repair import (
+    extract_json_object,
+    repair_json,
+)
 
 from argus.agents.base import (
     BaseAgent,
@@ -34,6 +40,7 @@ class RefuterConfig(AgentConfig):
     
     name: str = "Refuter"
     role: AgentRole = AgentRole.REFUTER
+    max_tokens: int = 8192
     
     min_rebuttal_strength: float = Field(
         default=0.4,
@@ -224,16 +231,21 @@ Return JSON:
     ]
 }}"""
         
-        response = self.generate(prompt)
+        response = self.generate(prompt, max_tokens=16384)
         
         rebuttals: list[Rebuttal] = []
         config = self.config if isinstance(self.config, RefuterConfig) else RefuterConfig()
-        
+
         try:
-            data = json.loads(response)
-            rebuttal_data = data.get("rebuttals", [])
+            data = extract_json_object(response)
+
+            rebuttal_data = data.get("rebuttals", []) if isinstance(data, dict) else data
+            if isinstance(rebuttal_data, dict):
+                rebuttal_data = [rebuttal_data]
             
             for rd in rebuttal_data[:config.max_rebuttals_per_round]:
+                if not isinstance(rd, dict):
+                    continue
                 strength = rd.get("strength", 0.5)
                 if strength < config.min_rebuttal_strength:
                     continue
@@ -257,8 +269,8 @@ Return JSON:
                 graph.add_rebuttal(rebuttal, target_id)
                 rebuttals.append(rebuttal)
                 
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse refuter response as JSON")
+        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+            logger.warning("Refuter JSON parse failed (%s) — raw: %s", exc, response[:300])
         
         self.log_action("generate_rebuttals", {
             "proposition_id": proposition_id,
@@ -322,10 +334,10 @@ Return JSON:
     ]
 }}"""
         
-        response = self.generate(prompt)
-        
+        response = self.generate(prompt, max_tokens=16384)
+
         try:
-            data = json.loads(response)
+            data = extract_json_object(response)
             return data.get("contradictions", [])
-        except json.JSONDecodeError:
+        except (ValueError, TypeError):
             return []
