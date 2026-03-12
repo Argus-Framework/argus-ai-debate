@@ -54,6 +54,7 @@ argus_report_final.pdf
 pdf_content.txt
 PUBLISHING.md
 crux.txt
+commands.txt
 crux_test_output.txt
 # PyPI rc (contains tokens - NEVER commit!)
 .pypirc
@@ -73,3 +74,26 @@ Testing
 node_modules
 git_auto_commit.py
 .next
+
+argus\architecture_diagrams
+
+JAIR AuthorKit
+
+jmlr-style-file-master
+
+old_paper
+
+_diag_llm.py
+
+ARGUS_Figure_Descriptions.txt
+
+argus_final_plots.zip
+
+
+argus_final_plots
+
+jmlr-style-file-master.zip
+
+texput.log
+
+argus (3)
