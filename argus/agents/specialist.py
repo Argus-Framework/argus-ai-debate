@@ -9,10 +9,16 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Optional, Any, TYPE_CHECKING
 from dataclasses import dataclass
 
 from pydantic import Field
+
+from argus.core.json_repair import (
+    extract_json_object,
+    repair_json,
+)
 
 from argus.agents.base import (
     BaseAgent,
@@ -233,34 +239,54 @@ When extracting claims, use this JSON format:
                         )
                         evidence_list.append(evidence)
         else:
-            # Generate synthetic evidence request for LLM
-            prompt = f"""Given this proposition, what evidence would you look for?
+            # Generate synthetic evidence via LLM
+            prompt = f"""You are a domain expert in {self.domain}. Analyze this proposition and provide concrete evidence.
 
 Proposition: {prop.text}
-Domain: {self.domain}
 
-List 3-5 types of evidence that would help evaluate this proposition.
-For each, indicate if it would likely support or attack the proposition.
+Return ONLY a JSON object — no markdown, no explanation, no extra text.
+Keep each "type" description under 30 words. Return 3 items max.
 
-Return as JSON:
-{{
-    "evidence_types": [
-        {{"type": "...", "polarity": "support/attack", "importance": 0.8}},
-        ...
-    ]
-}}"""
+{{"evidence_types":[{{"type":"brief description","polarity":"support","importance":0.8}}]}}"""
             
-            response = self.generate(prompt)
+            response = self.generate(prompt, max_tokens=16384)
             
+            # Robust JSON extraction via shared repair module
+            data = None
             try:
-                data = json.loads(response)
-                for et in data.get("evidence_types", [])[:3]:
-                    polarity = 1 if et.get("polarity") == "support" else -1
+                data = extract_json_object(response)
+            except (ValueError, TypeError):
+                pass
+            
+            # Normalize: accept any key containing a list of evidence items
+            evidence_items = None
+            if data:
+                if "evidence_types" in data:
+                    evidence_items = data["evidence_types"]
+                elif "evidence" in data:
+                    evidence_items = data["evidence"]
+                else:
+                    # Find the first list value in the dict
+                    for v in data.values():
+                        if isinstance(v, list):
+                            evidence_items = v
+                            break
+
+            if evidence_items:
+                for et in evidence_items[:5]:
+                    # Accept "type", "claim", "description", or "text" as the description field
+                    desc = (et.get("type") or et.get("claim") or
+                            et.get("description") or et.get("text") or "Evidence needed")
+                    # Accept "polarity" or "stance" field
+                    pol_str = (et.get("polarity") or et.get("stance") or "support").lower()
+                    polarity = -1 if "attack" in pol_str or "against" in pol_str or "counter" in pol_str else 1
+                    importance = float(et.get("importance", 0) or et.get("confidence", 0) or 0.6)
                     evidence = Evidence(
-                        text=f"[{self.domain}] {et.get('type', 'Evidence needed')}",
+                        text=f"[{self.domain}] {desc}",
                         evidence_type=EvidenceType.LITERATURE,
                         polarity=polarity,
-                        confidence=et.get("importance", 0.5),
+                        confidence=importance,
+                        quality=importance,
                         relevance=0.8,
                     )
                     graph.add_evidence(
@@ -269,8 +295,33 @@ Return as JSON:
                         EdgeType.SUPPORTS if polarity > 0 else EdgeType.ATTACKS,
                     )
                     evidence_list.append(evidence)
-            except json.JSONDecodeError:
-                pass
+            else:
+                # Fallback: generate basic evidence if JSON parsing fails entirely
+                logger.warning(
+                    "Specialist [%s] JSON parse failed, generating fallback evidence. Raw: %s",
+                    self.domain, response[:200],
+                )
+                for i, (pol, label) in enumerate([
+                    (1, "Supporting evidence from domain literature"),
+                    (-1, "Methodological concerns and limitations"),
+                    (1, "Corroborating findings from related studies"),
+                ]):
+                    if i >= config.max_evidence_per_query:
+                        break
+                    evidence = Evidence(
+                        text=f"[{self.domain}] {label} regarding: {prop.text[:80]}",
+                        evidence_type=EvidenceType.LITERATURE,
+                        polarity=pol,
+                        confidence=0.5,
+                        quality=0.5,
+                        relevance=0.7,
+                    )
+                    graph.add_evidence(
+                        evidence,
+                        proposition_id,
+                        EdgeType.SUPPORTS if pol > 0 else EdgeType.ATTACKS,
+                    )
+                    evidence_list.append(evidence)
         
         self.log_action("gather_evidence", {
             "proposition_id": proposition_id,
@@ -331,14 +382,14 @@ Return JSON:
     "relevance": 0.8
 }}"""
         
-        response = self.generate(prompt)
+        response = self.generate(prompt, max_tokens=8192)
         
         try:
-            data = json.loads(response)
+            data = extract_json_object(response)
             polarity_map = {"support": 1, "attack": -1, "neutral": 0}
             data["polarity_int"] = polarity_map.get(data.get("polarity", "neutral"), 0)
             return data
-        except json.JSONDecodeError:
+        except (ValueError, TypeError):
             return {
                 "claim": response[:200],
                 "confidence": 0.5,
